@@ -14,12 +14,12 @@ _C.data.voxel_size_1 = _C.data.voxel_size_0
 _C.data.max_numPts = 15000
 _C.data.manual_seed = 123
 _C.data.distributed = False
-_C.data.test_file_number = [500, 500, 500, 500]
-_C.data.train_file_number = [8000,7000,3500,5000]
+_C.data.test_file_number = [5, 5, 5, 5]
+_C.data.train_file_number = [8,7,35,5]
 _C.data.wo_anim = False
 # training
 _C.train = edict()
-_C.train.epoch = 10
+_C.train.epoch = 2
 _C.train.max_iter = 50000
 _C.train.batch_size = 1
 _C.train.num_workers = 16

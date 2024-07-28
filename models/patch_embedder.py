@@ -124,7 +124,7 @@ class MiniSpinNet(nn.Module):
         center = input[:, -1, :3]
         delta_x = input[:, :, :3] - center.unsqueeze(1)  # (B, npoint, 3), normalized coordinates
 
-        if dataset == '3DMatch' or dataset == '3DLoMatch':
+        if dataset == '3DMatch' or dataset == '3DLoMatch' or dataset == 'threedfront':
             if z_axis is None:
                 z_axis = utils.common.cal_Z_axis(delta_x, ref_point=center)
                 z_axis = utils.common.l2_norm(z_axis, axis=1)
