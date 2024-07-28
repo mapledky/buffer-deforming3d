@@ -21,6 +21,9 @@ parser = argparse.ArgumentParser()
 
 """"
 python code/BUFFER-main/ThreeDFront/train.py
+
+python -m torch.distributed.launch --nproc_per_node 2 code/BUFFER-main/ThreeDFront/train.py
+
 """
 class Args(object):
     def __init__(self, cfg):
@@ -28,8 +31,6 @@ class Args(object):
 
         # model
         self.model = buffer(cfg)
-        if cfg.data.distributed:
-            self.model = DDP(self.model, device_ids=[int(cfg.local_rank)], output_device=int(cfg.local_rank))
         self.parameter = self.model.get_parameter()
 
         # load pre-trained weights and freeze irrelevant modules
@@ -61,8 +62,10 @@ class Args(object):
                                                           gamma=cfg.optim.lr_decay)  # training speed related to gamma
         self.scheduler_interval = cfg.optim.scheduler_interval[cfg.stage]
 
-        self.model = self.model.cuda()
-        self.model = torch.nn.DataParallel(self.model, device_ids=[0])
+        self.model = self.model.cuda(device=cfg.device)
+        if cfg.data.distributed:
+            self.model = DDP(self.model, device_ids=[int(cfg.local_rank)], output_device=int(cfg.local_rank), find_unused_parameters=True)
+        # self.model = torch.nn.DataParallel(self.model, device_ids=[0])
 
         # dataloader
         self.train_loader = get_dataloader(split='train',
@@ -93,6 +96,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     local_rank = args.local_rank
     torch.cuda.set_device(f'cuda:{local_rank}')
+    cfg.device = torch.device('cuda')
 
     if cfg.data.distributed:
         dist.init_process_group(backend='nccl')

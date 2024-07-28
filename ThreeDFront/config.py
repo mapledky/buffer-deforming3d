@@ -16,6 +16,7 @@ _C.data.manual_seed = 123
 _C.data.distributed = False
 _C.data.test_file_number = [500, 500, 500, 500]
 _C.data.train_file_number = [8000,7000,3500,5000]
+# _C.data.train_file_number = [80,70,35,50]
 _C.data.wo_anim = False
 # training
 _C.train = edict()

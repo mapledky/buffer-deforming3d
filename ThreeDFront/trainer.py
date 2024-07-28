@@ -4,8 +4,10 @@ from utils.timer import Timer, AverageMeter
 from loss.desc_loss import ContrastiveLoss, cdist
 from tensorboardX import SummaryWriter
 from utils.common import make_open3d_point_cloud, ensure_dir
-
+from collections import OrderedDict
 from tqdm import tqdm
+import os
+
 class Trainer(object):
     def __init__(self, args):
         # parameters
@@ -61,7 +63,7 @@ class Trainer(object):
             self.train_epoch(epoch)
 
             if (epoch + 1) % self.evaluate_interval == 0 or epoch == 0:
-                res = self.evaluate()
+                res = self.evaluate(epoch)
                 print(f'Evaluation: Epoch {epoch}')
                 for key in res.keys():
                     print(f"{key}: {res[key]}")
@@ -106,10 +108,14 @@ class Trainer(object):
         num_batch = len(self.train_loader)
         num_iter = min(self.cfg.train.max_iter, num_batch)
         data_iter = iter(self.train_loader)
-        for i in tqdm(range(num_iter)):
-            data_timer.tic()
-            data_source = data_iter.next()
 
+        if self.cfg.data.distributed:
+            print('epoch ', epoch)
+            self.train_loader.sampler.set_epoch(epoch)
+        total_iterations = len(self.train_loader)
+        for c_iter, data_iter  in enumerate(tqdm(self.train_loader)): # loop through this epoch 
+            data_timer.tic()
+            data_source = data_iter
             # calc normals
             src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
             src_pcd = make_open3d_point_cloud(src_pts.numpy(), [1, 0.706, 0])
@@ -214,8 +220,8 @@ class Trainer(object):
                 if stats.get(key) is not None:
                     self.meter_dict[key].update(stats[key])
 
-            if (i + 1) % 200 == 0:
-                print(f"Epoch: {epoch + 1} [{i + 1:4d}/{num_iter}] "
+            if (c_iter + 1) % 200 == 0:
+                print(f"Epoch: {epoch + 1} [{c_iter + 1:4d}/{num_iter}] "
                       f"data_time: {data_timer.avg:.2f}s "
                       f"model_time: {model_timer.avg:.2f}s ")
                 for key in self.meter_dict.keys():
@@ -223,7 +229,7 @@ class Trainer(object):
                     self.meter_dict[key].reset()
         self._snapshot(f'{epoch}')
 
-    def evaluate(self):
+    def evaluate(self, epoch):
         print('validation start!!')
         self.model.eval()
         data_timer, model_timer = Timer(), Timer()
@@ -231,9 +237,11 @@ class Trainer(object):
         with torch.no_grad():
             num_batch = len(self.val_loader)
             data_iter = iter(self.val_loader)
-            for i in range(num_batch):
+            if self.cfg.data.distributed:
+                self.val_loader.sampler.set_epoch(epoch)
+            for c_iter, data_iter  in enumerate(tqdm(self.val_loader)): # loop through this epoch   
                 data_timer.tic()
-                data_source = data_iter.next()
+                data_source = data_iter
 
                 # calc normals
                 src_pts, tgt_pts = data_source['src_pcd'], data_source['tgt_pcd']
@@ -322,7 +330,10 @@ class Trainer(object):
     def _snapshot(self, info):
         save_path = self.cfg.snapshot_root + f'/{self.train_modal}'
         ensure_dir(save_path)
-        torch.save(self.model.module.state_dict(), save_path + f'/{info}.pth')
+        model_state_dict = self.model.state_dict()
+        if self.cfg.data.distributed:
+            model_state_dict = OrderedDict([(key[7:], value) for key, value in model_state_dict.items()])
+        torch.save(model_state_dict, save_path + f'/{info}.pth')
         print(f"Save model to {save_path}/{info}.pth")
 
     def _get_lr(self, group=0):

@@ -245,11 +245,15 @@ def collate_fn_descriptor(list_data, config, neighborhood_limits):
     return dict_inputs
 
 
-def get_dataloader(split, config, num_workers=16, shuffle=True, drop_last=True, sampler=None):
+def get_dataloader(split, config, num_workers=16, shuffle=True, drop_last=True):
     dataset = ThreeDFrontDataset(
         split=split,
         config=config
     )
+    if config.data.distributed:
+        sampler = torch.utils.data.distributed.DistributedSampler(dataset)
+    else:
+        sampler = None
 
     # calibrate the number of neighborhood
     neighborhood_limits = calibrate_neighbors(dataset, config, collate_fn=collate_fn_descriptor)
